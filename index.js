@@ -54,12 +54,14 @@ app.get('/youtube/', (req, res) => {
             if (req.query.type == 'audio') {
                 ytdl(req.query.url, { filter: 'audioonly' }).pipe(res);
             } else if (req.query.type == 'video' || !req.query.type) {
+                res.header('Content-Disposition', 'attachment; filename="video.mp4"');
                 if (req.query.quality == 'low' || !req.query.quality) {
                     ytdl(req.query.url).pipe(res);
                 } else if (req.query.quality == 'high') {
                     ytdl(req.query.url, { quality: 'highest' }).pipe(res);
                 }
             } else if (req.query.type == 'both') {
+                res.header('Content-Disposition', 'attachment; filename="video.mp4"');
                 ytdl(req.query.url, { quality: 'highestvideo' }).pipe(ffmpegProcess.stdio[3]);
                 ytdl(req.query.url, { filter: 'audioonly' }).pipe(ffmpegProcess.stdio[4]);
                 ffmpegProcess.stdio[1].pipe(res);
