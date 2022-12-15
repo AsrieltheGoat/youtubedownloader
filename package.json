@@ -4,14 +4,17 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "nodemon index.js"
+    "start": "node index.js",
+    "run": "nodemon index.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "child_process": "^1.0.2",
     "dotenv": "^16.0.3",
     "express": "^4.18.2",
+    "ffmpeg-static": "^5.1.0",
     "ytdl-core": "^4.11.2"
   }
 }

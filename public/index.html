@@ -7,6 +7,54 @@
     <title>Document</title>
 </head>
 <body>
-    <h1>Hello World</h1>
+    <section>
+        <h1>Just another youtube downloader</h1>
+        <h3>How to use</h3>
+
+        <h2>Queries</h2>
+        <p>url: youtube video url or id</p>
+        <p>info: true or false</p>
+        <p>type: video, audio or both</p>
+        <p>quality: low or high (Doesn't work with type=both nor type=audio)</p>
+
+        <h2>Examples</h2>
+        <p>Get video info: youtube?info=true&url=https://www.youtube.com/watch?v=dQw4w9WgXcQ</p>
+        <p>Get video in low quality: youtube?info=false&url=https://www.youtube.com/watch?v=dQw4w9WgXcQ&type=video&quality=low</p>
+        <p>Get video in high quality (No audio): youtube?info=false&url=https://www.youtube.com/watch?v=dQw4w9WgXcQ&type=video&quality=high</p>
+        <p>Get video with high quality and audio: youtube?info=false&url=https://www.youtube.com/watch?v=dQw4w9WgXcQ&type=both</p>
+        <p>Get only audio: youtube?info=false&url=https://www.youtube.com/watch?v=dQw4w9WgXcQ&type=audio</p>
+
+        <h2>Use it right now</h2>
+        <fieldset>
+            <legend>Get video info</legend>
+            <form action="youtube" method="get">
+                <input type="hidden" name="info" value="true">
+                <input type="text" name="url" placeholder="https://www.youtube.com/watch?v=dQw4w9WgXcQ">
+                <input type="submit" value="Get info">
+            </form>
+        </fieldset>
+        <fieldset>
+            <legend>Get video</legend>
+            <form action="youtube" method="get">
+                <input type="hidden" name="info" value="false">
+                <input type="text" name="url" placeholder="https://www.youtube.com/watch?v=dQw4w9WgXcQ">
+                <select name="type">
+                    <option value="video">Video</option>
+                    <option value="audio">Audio</option>
+                    <option value="both">Both</option>
+                </select>
+                <select name="quality">
+                    <option value="low">Low quality</option>
+                    <option value="high">High quality</option>
+                </select>
+                <input type="submit" value="Get video">
+            </form>
+        </fieldset>
+        <fieldset>
+            <legend>Contact</legend>
+            <p>Website: <a href="https://dreemurr.ga">Website</a></p>
+            <p>GitHub: <a href="https://github.com/AsrieltheGoat">Github</a></p>
+        </fieldset>
+    </section>
 </body>
 </html>
