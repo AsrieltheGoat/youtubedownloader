@@ -10,7 +10,7 @@ app.get("/", (req, res) => {
     res.sendFile(__dirname + "/public/index.html");
 });
 
-app.get("/youtube/", (req, res) => {
+app.get("/youtube", (req, res) => {
     if (req.query.url) {
         if (req.query.info == "true") {
             ytdl.getInfo(req.query.url).then((info) => {
@@ -26,76 +26,72 @@ app.get("/youtube/", (req, res) => {
                     thumbnail: info.videoDetails.thumbnails[0].url,
                     owner: info.videoDetails.author.name,
                     owner_url: info.videoDetails.author.user_url,
-                    owner_profile_picture:
-                        info.videoDetails.author.thumbnails[0].url,
-                    owner_subscribers:
-                        info.videoDetails.author.subscriber_count,
+                    owner_profile_picture: info.videoDetails.author.thumbnails[0].url,
+                    owner_subscribers: info.videoDetails.author.subscriber_count,
                     owner_verified: info.videoDetails.author.verified,
                 });
             });
         } else {
             if (req.query.type == "audio") {
+                
                 ytdl(req.query.url, { filter: "audioonly" }).pipe(res);
             }
 
             if (req.query.type == "video" || !req.query.type) {
-                res.header(
-                    "Content-Disposition",
-                    'attachment; filename="video.mp4"'
-                );
+                ytdl.getInfo(req.query.url).then((info) => {
+                    var videoName = info.videoDetails.title + ".mp4";
 
-                if (req.query.quality == "low" || !req.query.quality) {
-                    ytdl(req.query.url).pipe(res);
-                }
+                    res.header(
+                        `Content-Disposition`,
+                        `attachment; filename=${videoName}`
+                    );
 
-                if (req.query.quality == "high") {
-                    ytdl(req.query.url, { quality: "highest" }).pipe(res);
-                }
+                    if (req.query.quality == "low" || !req.query.quality) {
+                        ytdl(req.query.url).pipe(res);
+                    }
+
+                    if (req.query.quality == "high") {
+                        ytdl(req.query.url, { quality: "highest" }).pipe(res);
+                    }
+                })
             }
 
             if (req.query.type == "both") {
-                const ffmpegProcess = cp.spawn(
-                    ffmpeg,
-                    [
-                        "-i",
-                        `pipe:3`,
-                        "-i",
-                        `pipe:4`,
-                        "-map",
-                        "0:v",
-                        "-map",
-                        "1:a",
-                        "-c:v",
-                        "copy",
-                        "-c:a",
-                        "libmp3lame",
-                        "-crf",
-                        "27",
-                        "-preset",
-                        "veryfast",
-                        "-movflags",
-                        "frag_keyframe+empty_moov",
-                        "-f",
-                        "mp4",
-                        "-loglevel",
-                        "error",
-                        "-",
-                    ],
-                    {
-                        stdio: ["pipe", "pipe", "pipe", "pipe", "pipe"],
-                    }
-                );
-                res.header(
-                    "Content-Disposition",
-                    'attachment; filename="video.mp4"'
-                );
-                ytdl(req.query.url, { quality: "highestvideo" }).pipe(
-                    ffmpegProcess.stdio[3]
-                );
-                ytdl(req.query.url, { filter: "audioonly" }).pipe(
-                    ffmpegProcess.stdio[4]
-                );
-                ffmpegProcess.stdio[1].pipe(res);
+                ytdl.getInfo(req.query.url).then((info) => {
+                    var videoName = info.videoDetails.title + ".mp4";
+
+                    const ffmpegProcess = cp.spawn(
+                        ffmpeg,
+                        [
+                            '-i', `pipe:3`,
+                            '-i', `pipe:4`,
+                            '-map', '0:v',
+                            '-map', '1:a',
+                            '-c:v', 'copy',
+                            '-c:a', 'libmp3lame',
+                            '-crf', '27',
+                            '-preset', 'veryfast',
+                            '-movflags', 'frag_keyframe+empty_moov',
+                            '-f', 'mp4',
+                            '-loglevel', 'error',
+                            '-'
+                        ],
+                        {
+                            stdio: ["pipe", "pipe", "pipe", "pipe", "pipe"],
+                        }
+                    );
+                    res.header(
+                        `Content-Disposition`,
+                        `attachment; filename=${videoName}`
+                    );
+                    ytdl(req.query.url, { quality: "highestvideo" }).pipe(
+                        ffmpegProcess.stdio[3]
+                    );
+                    ytdl(req.query.url, { filter: "audioonly" }).pipe(
+                        ffmpegProcess.stdio[4]
+                    );
+                    ffmpegProcess.stdio[1].pipe(res);
+                });
             }
         }
     } else {
