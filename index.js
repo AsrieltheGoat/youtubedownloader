@@ -10,6 +10,8 @@ const port = 3000;
 
 const tempDir = path.join(__dirname, "public", "temp");
 
+// TODO: Figure out how to add video length to the output of the ffmpeg
+
 // Create the temporary directory if it doesn't exist
 if (!fs.existsSync(tempDir)) {
     fs.mkdirSync(tempDir);
@@ -71,6 +73,7 @@ app.get("/youtube", async (req, res) => {
             ) {
                 const info = await ytdl.getInfo(url);
                 const videoName = info.videoDetails.title;
+                const videoLength = info.videoDetails.lengthSeconds;
 
                 if (format === "audio") {
                     const audio = ytdl(url, {
@@ -88,7 +91,7 @@ app.get("/youtube", async (req, res) => {
                         "mp3",
                         "-ab",
                         "192000",
-                        "-vn",
+                        "-vn", // Delete video, only keep audio
                         "-loglevel",
                         "error",
                         "pipe:1",
@@ -107,11 +110,12 @@ app.get("/youtube", async (req, res) => {
 
                     try {
                         // Check if the file already exists
+                        const downloadLink = `/download/${encodeURIComponent(
+                            `${videoName}.mp3`
+                        )}`;
+
                         const filePath = path.join(tempDir, `${videoName}.mp3`);
                         if (fs.existsSync(filePath)) {
-                            const downloadLink = `http://127.0.0.1:3000/download/${encodeURIComponent(
-                                `${videoName}.mp3`
-                            )}`;
                             return res.redirect(downloadLink);
                         }
 
@@ -120,9 +124,6 @@ app.get("/youtube", async (req, res) => {
                             `${videoName}.mp3`
                         );
 
-                        const downloadLink = `http://127.0.0.1:3000/download/${encodeURIComponent(
-                            `${videoName}.mp3`
-                        )}`;
                         return res.redirect(downloadLink);
                     } catch (error) {
                         console.error("Error saving file:", error);
@@ -150,6 +151,8 @@ app.get("/youtube", async (req, res) => {
                             `pipe:3`,
                             "-i",
                             `pipe:4`,
+                            "-ss",
+                            "00:00:00",
                             "-map",
                             "0:v",
                             "-map",
@@ -171,14 +174,21 @@ app.get("/youtube", async (req, res) => {
                             "-",
                         ],
                         {
-                            //stdin (standard input), stdout, stderr (standard error), pipe 3 (video input), and pipe 4 (audio input)
-                            stdio: ["pipe", "pipe", "pipe", "pipe", "pipe"],
+                            //stdin (standard input), stdout, stderr (standard error), pipe 3 (video input), pipe 4 (audio input), and pipe 5 (video length input)
+                            stdio: [
+                                "pipe",
+                                "pipe",
+                                "pipe",
+                                "pipe",
+                                "pipe",
+                                "pipe",
+                            ],
                         }
                     );
 
                     video.pipe(ffmpegProcess.stdio[3]);
                     audio.pipe(ffmpegProcess.stdio[4]);
-
+                
                     ffmpegProcess.on("error", (err) => {
                         // Handle the error by sending it to the response object
                         res.send(err.toString());
@@ -190,11 +200,12 @@ app.get("/youtube", async (req, res) => {
 
                     try {
                         // Check if the file already exists
+                        const downloadLink = `/download/${encodeURIComponent(
+                            `${videoName}.mp4`
+                        )}`;
+
                         const filePath = path.join(tempDir, `${videoName}.mp4`);
                         if (fs.existsSync(filePath)) {
-                            const downloadLink = `http://127.0.0.1:3000/download/${encodeURIComponent(
-                                `${videoName}.mp4`
-                            )}`;
                             return res.redirect(downloadLink);
                         }
 
@@ -203,9 +214,6 @@ app.get("/youtube", async (req, res) => {
                             `${videoName}.mp4`
                         );
 
-                        const downloadLink = `http://127.0.0.1:3000/download/${encodeURIComponent(
-                            `${videoName}.mp4`
-                        )}`;
                         return res.redirect(downloadLink);
                     } catch (error) {
                         console.error("Error saving file:", error);

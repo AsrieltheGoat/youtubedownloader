@@ -1,25 +1,34 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
-</head>
-<body>
-    <fieldset>
-        <legend>Get youtube video/audio</legend>
-        <form action="youtube" method="get">
-            <input type="text" name="url" placeholder="https://www.youtube.com/watch?v=dQw4w9WgXcQ" required>
-            <select name="format">
-                <option value="video">Video</option>
-                <option value="audio">Audio</option>
-            </select>
-            <select name="quality">
-                <option value="lowest">Lowest quality</option>
-                <option value="highest">Highest quality</option>
-            </select>
-            <input type="submit" value="Submit">
-        </form>
-    </fieldset>
-</body>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Document</title>
+    </head>
+    <body>
+        <fieldset>
+            <legend>Get youtube video/audio</legend>
+            <form action="youtube" method="get">
+                <input
+                    type="text"
+                    name="url"
+                    placeholder="https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+                    required
+                />
+                <select name="info">
+                    <option value="true">Get Info</option>
+                    <option value="false">Download</option>
+                </select>
+                <select name="format">
+                    <option value="video">Video</option>
+                    <option value="audio">Audio</option>
+                </select>
+                <select name="quality">
+                    <option value="lowest">Lowest quality</option>
+                    <option value="highest">Highest quality</option>
+                </select>
+                <input type="submit" value="Submit" />
+            </form>
+        </fieldset>
+    </body>
 </html>
