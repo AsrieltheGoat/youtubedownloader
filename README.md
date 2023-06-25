@@ -1,5 +1,5 @@
 # Barebone YouTube Downloader
-This is a simple YouTube downloader that allows you to download YouTube videos as MP3 files.
+This is a simple YouTube downloader that allows you to download YouTube videos as video/audio files.
 
 ## Installation
 To install the dependencies, run:
