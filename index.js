@@ -1,18 +1,55 @@
 const ytdl = require("ytdl-core");
 const cp = require("child_process");
 const ffmpeg = require("ffmpeg-static");
-
-// Set up express server
 const express = require("express");
+const fs = require("fs");
+const path = require("path");
+
 const app = express();
 const port = 3000;
+
+const tempDir = path.join(__dirname, "public", "temp");
+
+// Create the temporary directory if it doesn't exist
+if (!fs.existsSync(tempDir)) {
+    fs.mkdirSync(tempDir);
+}
+
+// Save res (stream) to file using a temporary file saver
+const saveFileToTemp = async (stream, filename) => {
+    const filePath = path.join(tempDir, filename);
+    if (fs.existsSync(filePath)) {
+        throw new Error("File already exists");
+    }
+    const fileStream = fs.createWriteStream(filePath);
+    stream.pipe(fileStream);
+    return new Promise((resolve, reject) => {
+        fileStream.on("finish", resolve);
+        fileStream.on("error", reject);
+    });
+};
 
 app.get("/", (req, res) => {
     res.sendFile(__dirname + "/public/index.html");
 });
 
-// Url, info=true/false, format=audio/video, quality=highest/lowest/highestvideo/lowestvideo
-// TODO: Save res (stream) to file using a temporary file saver (On ChatGPT)
+app.get("/download/:filename", (req, res) => {
+    const filename = decodeURIComponent(req.params.filename);
+    const filePath = path.join(tempDir, filename);
+    res.download(filePath, (err) => {
+        if (err) {
+            console.error("Error downloading file:", err);
+            return res.status(500).send("Error downloading file");
+        }
+        // Delete the file after successful download
+        fs.unlink(filePath, (unlinkErr) => {
+            if (unlinkErr) {
+                console.error("Error deleting file:", unlinkErr);
+            }
+        });
+    });
+});
+
 app.get("/youtube", async (req, res) => {
     const url = req.query.url;
     const info = req.query.info;
@@ -20,41 +57,28 @@ app.get("/youtube", async (req, res) => {
     const quality = req.query.quality;
 
     if (ytdl.validateURL(url) || ytdl.validateID(url)) {
-        if (info == "true") {
-            // Get video info
+        if (info === "true") {
             const info = await ytdl.getInfo(url);
             return res.send(info);
         }
 
         if (format) {
-            // check if quality is highest, lowest, highestvideo, lowestvideo
             if (
-                quality == "highest" ||
-                quality == "lowest" ||
-                quality == "highestvideo" ||
-                quality == "lowestvideo"
+                quality === "highest" ||
+                quality === "lowest" ||
+                quality === "highestvideo" ||
+                quality === "lowestvideo"
             ) {
-                // Get the video name
                 const info = await ytdl.getInfo(url);
                 const videoName = info.videoDetails.title;
 
-                if (format == "audio") {
-                    // Pipe audio to ffmpeg
+                if (format === "audio") {
                     const audio = ytdl(url, {
                         filter: "audioonly",
                         quality: quality,
                         highWaterMark: 1 << 25,
                     });
 
-                    // Set the content disposition header to force download
-                    res.setHeader(
-                        "Content-Disposition",
-                        `attachment; filename="${encodeURIComponent(
-                            `${videoName}.mp3`
-                        )}"`
-                    );
-
-                    // Pipe audio to ffmpeg
                     const ffmpegProcess = cp.spawn(ffmpeg, [
                         "-i",
                         "pipe:0",
@@ -65,45 +89,60 @@ app.get("/youtube", async (req, res) => {
                         "-ab",
                         "192000",
                         "-vn",
+                        "-loglevel",
+                        "error",
                         "pipe:1",
                     ]);
 
-                    // Pipe ffmpeg output to response
                     audio.pipe(ffmpegProcess.stdin);
-                    ffmpegProcess.stdout.pipe(res); // Output of the ffmpeg
 
-                    // Kill ffmpeg process if the user closes the connection
+                    ffmpegProcess.on("error", (err) => {
+                        // Handle the error by sending it to the response object
+                        res.send(err.toString());
+                    });
+
                     res.on("close", () => {
                         ffmpegProcess.kill("SIGKILL");
                     });
 
-                    return;
+                    try {
+                        // Check if the file already exists
+                        const filePath = path.join(tempDir, `${videoName}.mp3`);
+                        if (fs.existsSync(filePath)) {
+                            const downloadLink = `http://127.0.0.1:3000/download/${encodeURIComponent(
+                                `${videoName}.mp3`
+                            )}`;
+                            return res.redirect(downloadLink);
+                        }
+
+                        await saveFileToTemp(
+                            ffmpegProcess.stdout,
+                            `${videoName}.mp3`
+                        );
+
+                        const downloadLink = `http://127.0.0.1:3000/download/${encodeURIComponent(
+                            `${videoName}.mp3`
+                        )}`;
+                        return res.redirect(downloadLink);
+                    } catch (error) {
+                        console.error("Error saving file:", error);
+                        return res.status(500).send("Error saving file");
+                    }
                 }
 
-                if (format == "video") {
-                    // Pipe video to ffmpeg
+                if (format === "video") {
                     const video = ytdl(url, {
                         filter: "videoonly",
                         quality: quality,
                         highWaterMark: 1 << 25,
                     });
 
-                    // Pipe audio to ffmpeg
                     const audio = ytdl(url, {
                         filter: "audioonly",
                         quality: quality,
                         highWaterMark: 1 << 25,
                     });
 
-                    // Set the content disposition header to force download
-                    res.setHeader(
-                        "Content-Disposition",
-                        `attachment; filename="${encodeURIComponent(
-                            `${videoName}.mp3`
-                        )}"`
-                    );
-
-                    // Pipe ffmpeg output to response
                     const ffmpegProcess = cp.spawn(
                         ffmpeg,
                         [
@@ -132,46 +171,58 @@ app.get("/youtube", async (req, res) => {
                             "-",
                         ],
                         {
+                            //stdin (standard input), stdout, stderr (standard error), pipe 3 (video input), and pipe 4 (audio input)
                             stdio: ["pipe", "pipe", "pipe", "pipe", "pipe"],
                         }
                     );
 
                     video.pipe(ffmpegProcess.stdio[3]);
                     audio.pipe(ffmpegProcess.stdio[4]);
-                    ffmpegProcess.stdio[1].pipe(res); // Pipe ffmpeg output to response
 
-                    let ffmpegLogs = "";
-
-                    ffmpegProcess.stdio[2].on("data", (chunk) => {
-                        ffmpegLogs += chunk.toString();
+                    ffmpegProcess.on("error", (err) => {
+                        // Handle the error by sending it to the response object
+                        res.send(err.toString());
                     });
 
-                    ffmpegProcess.on("exit", (exitCode) => {
-                        if (exitCode === 1) {
-                            console.error(ffmpegLogs);
+                    res.on("close", () => {
+                        ffmpegProcess.kill("SIGKILL");
+                    });
+
+                    try {
+                        // Check if the file already exists
+                        const filePath = path.join(tempDir, `${videoName}.mp4`);
+                        if (fs.existsSync(filePath)) {
+                            const downloadLink = `http://127.0.0.1:3000/download/${encodeURIComponent(
+                                `${videoName}.mp4`
+                            )}`;
+                            return res.redirect(downloadLink);
                         }
-                    });
 
-                    return;
+                        await saveFileToTemp(
+                            ffmpegProcess.stdout,
+                            `${videoName}.mp4`
+                        );
+
+                        const downloadLink = `http://127.0.0.1:3000/download/${encodeURIComponent(
+                            `${videoName}.mp4`
+                        )}`;
+                        return res.redirect(downloadLink);
+                    } catch (error) {
+                        console.error("Error saving file:", error);
+                        return res.status(500).send("Error saving file");
+                    }
                 }
-                return res
-                    .status(400)
-                    .send(
-                        "Invalid quality<br/>Valid qualities: highest, lowest, highestvideo, lowestvideo"
-                    );
+            } else {
+                return res.status(400).send("Invalid quality parameter");
             }
+        } else {
+            return res.status(400).send("Missing format parameter");
         }
-        return res
-            .status(400)
-            .send("Invalid format<br/>Valid formats: audio, video");
+    } else {
+        return res.status(400).send("Invalid YouTube URL or ID");
     }
-    return res
-        .status(400)
-        .send(
-            "Invalid URL<br/>Enter an valid YouTube URL/ID<br/>Example: https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-        );
 });
 
 app.listen(port, () => {
-    console.log(`Listening on port ${port}!`);
+    console.log(`Server running at http://localhost:${port}`);
 });
