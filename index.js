@@ -11,7 +11,8 @@ app.get("/", (req, res) => {
     res.sendFile(__dirname + "/public/index.html");
 });
 
-// Url, info=true/false, format=audio/video
+// Url, info=true/false, format=audio/video, quality=highest/lowest/highestvideo/lowestvideo
+// TODO: Save res (stream) to file using a temporary file saver (On ChatGPT)
 app.get("/youtube", async (req, res) => {
     const url = req.query.url;
     const info = req.query.info;
@@ -26,60 +27,60 @@ app.get("/youtube", async (req, res) => {
         }
 
         if (format) {
-            // Get the video name
-            const info = await ytdl.getInfo(url);
-            const videoName = info.videoDetails.title;
+            // check if quality is highest, lowest, highestvideo, lowestvideo
+            if (
+                quality == "highest" ||
+                quality == "lowest" ||
+                quality == "highestvideo" ||
+                quality == "lowestvideo"
+            ) {
+                // Get the video name
+                const info = await ytdl.getInfo(url);
+                const videoName = info.videoDetails.title;
 
-            if (format == "audio") {
-                // Pipe audio to ffmpeg
-                const audio = ytdl(url, {
-                    filter: "audioonly",
-                    highWaterMark: 1 << 25,
-                });
+                if (format == "audio") {
+                    // Pipe audio to ffmpeg
+                    const audio = ytdl(url, {
+                        filter: "audioonly",
+                        quality: quality,
+                        highWaterMark: 1 << 25,
+                    });
 
-                // Set the file name to the video name
-                const fileName = `${videoName}.mp3`;
+                    // Set the content disposition header to force download
+                    res.setHeader(
+                        "Content-Disposition",
+                        `attachment; filename="${encodeURIComponent(
+                            `${videoName}.mp3`
+                        )}"`
+                    );
 
-                // Encode file name
-                const encodedFileName = encodeURIComponent(fileName);
-                // Set the content disposition header to force download
-                res.setHeader(
-                    "Content-Disposition",
-                    `attachment; filename="${encodedFileName}"`
-                );
+                    // Pipe audio to ffmpeg
+                    const ffmpegProcess = cp.spawn(ffmpeg, [
+                        "-i",
+                        "pipe:0",
+                        "-acodec",
+                        "libmp3lame",
+                        "-f",
+                        "mp3",
+                        "-ab",
+                        "192000",
+                        "-vn",
+                        "pipe:1",
+                    ]);
 
-                // Pipe audio to ffmpeg
-                const ffmpegProcess = cp.spawn(ffmpeg, [
-                    "-i",
-                    "pipe:0",
-                    "-f",
-                    "mp3",
-                    "-ab",
-                    "192000",
-                    "-vn",
-                    "pipe:1",
-                ]);
+                    // Pipe ffmpeg output to response
+                    audio.pipe(ffmpegProcess.stdin);
+                    ffmpegProcess.stdout.pipe(res); // Output of the ffmpeg
 
-                // Pipe ffmpeg output to response
-                audio.pipe(ffmpegProcess.stdin);
-                ffmpegProcess.stdout.pipe(res);
+                    // Kill ffmpeg process if the user closes the connection
+                    res.on("close", () => {
+                        ffmpegProcess.kill("SIGKILL");
+                    });
 
-                // Kill ffmpeg process if the user closes the connection
-                res.on("close", () => {
-                    ffmpegProcess.kill("SIGKILL");
-                });
+                    return;
+                }
 
-                return;
-            }
-
-            if (format == "video") {
-                // check if quality is highest, lowest, highestvideo, lowestvideo
-                if (
-                    quality == "highest" ||
-                    quality == "lowest" ||
-                    quality == "highestvideo" ||
-                    quality == "lowestvideo"
-                ) {
+                if (format == "video") {
                     // Pipe video to ffmpeg
                     const video = ytdl(url, {
                         filter: "videoonly",
@@ -90,18 +91,16 @@ app.get("/youtube", async (req, res) => {
                     // Pipe audio to ffmpeg
                     const audio = ytdl(url, {
                         filter: "audioonly",
+                        quality: quality,
                         highWaterMark: 1 << 25,
                     });
 
-                    // Set the file name to the video name
-                    const fileName = `${videoName}.mp4`;
-
-                    // Encode file name
-                    const encodedFileName = encodeURIComponent(fileName);
                     // Set the content disposition header to force download
                     res.setHeader(
                         "Content-Disposition",
-                        `attachment; filename="${encodedFileName}"`
+                        `attachment; filename="${encodeURIComponent(
+                            `${videoName}.mp3`
+                        )}"`
                     );
 
                     // Pipe ffmpeg output to response
